@@ -1,0 +1,5 @@
+.tools/
+.verification/
+frontend/.dart_tool/
+frontend/build/
+prd.md

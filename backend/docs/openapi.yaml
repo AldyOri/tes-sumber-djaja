@@ -1,0 +1,611 @@
+openapi: 3.0.3
+info:
+  title: Warehouse Stock Transfer API
+  version: 1.0.0
+  description: |
+    Studi Kasus 2 — Mutasi Stok Antar Gudang.
+    Semua endpoint menggunakan JSON. Pesan validasi menggunakan Bahasa Indonesia.
+    Mutasi langsung selesai dan tidak dapat diubah atau dihapus.
+    Waktu respons menggunakan UTC (ISO 8601); tampilkan dalam Asia/Jakarta pada frontend.
+    POST mutasi tidak mendukung idempotency dan tidak boleh diulang otomatis.
+    Jika hasil permintaan tidak diketahui, periksa riwayat dan stok terlebih dahulu.
+    Error 503 DATABASE_BUSY berarti transaksi telah dibatalkan dan dapat dicoba ulang oleh operator.
+    Error koneksi dapat memiliki hasil commit yang tidak diketahui.
+    Tidak ada autentikasi pada MVP ini.
+servers:
+  - url: /api
+tags:
+  - name: Health
+  - name: Items
+  - name: Warehouses
+  - name: Stocks
+  - name: Transfers
+paths:
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Periksa kesiapan aplikasi dan tabel database
+      responses:
+        '200':
+          description: Aplikasi dan database siap.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [status, database, timestamp]
+                    properties:
+                      status: { type: string, enum: [ok] }
+                      database: { type: string, enum: [ready] }
+                      timestamp: { type: string, format: date-time }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /items:
+    get:
+      tags: [Items]
+      operationId: listItems
+      summary: Daftar barang, diurutkan berdasarkan SKU lalu ID
+      parameters:
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Daftar barang. Pencarian substring literal pada SKU atau nama.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Item' }
+                  meta: { $ref: '#/components/schemas/Pagination' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+    post:
+      tags: [Items]
+      operationId: createItem
+      summary: Tambah barang dengan stok awal nol
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ItemInput' }
+      responses:
+        '201':
+          description: Barang dibuat. Tidak membuat atau menambah saldo stok.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ItemResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+  /items/{id}:
+    put:
+      tags: [Items]
+      operationId: updateItem
+      summary: Ubah metadata barang tanpa mengubah stok
+      description: Semua field wajib dikirim. Satuan tidak dapat diubah jika saldo stok atau riwayat mutasi sudah ada, termasuk saldo nol.
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ItemInput' }
+      responses:
+        '200':
+          description: Metadata barang diperbarui.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ItemResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+  /warehouses:
+    get:
+      tags: [Warehouses]
+      operationId: listWarehouses
+      summary: Daftar gudang, diurutkan berdasarkan kode lalu ID
+      parameters:
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Daftar gudang. Pencarian substring literal pada kode atau nama.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Warehouse' }
+                  meta: { $ref: '#/components/schemas/Pagination' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+    post:
+      tags: [Warehouses]
+      operationId: createWarehouse
+      summary: Tambah gudang dengan stok awal nol
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseInput' }
+      responses:
+        '201':
+          description: Gudang dibuat tanpa menambah saldo stok.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+  /warehouses/{id}:
+    put:
+      tags: [Warehouses]
+      operationId: updateWarehouse
+      summary: Ubah metadata gudang tanpa mengubah stok
+      description: Kode dan nama wajib dikirim. Alamat yang dikosongkan atau tidak dikirim disimpan sebagai null.
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseInput' }
+      responses:
+        '200':
+          description: Metadata gudang diperbarui.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+  /warehouses/{id}/stocks:
+    get:
+      tags: [Stocks]
+      operationId: listWarehouseStocks
+      summary: Stok seluruh barang pada satu gudang
+      description: Barang tanpa baris saldo tetap ditampilkan dengan quantity nol. Diurutkan berdasarkan SKU lalu ID barang.
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Daftar stok. Search mencari SKU atau nama barang.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Stock' }
+                  meta: { $ref: '#/components/schemas/Pagination' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+  /transfers:
+    get:
+      tags: [Transfers]
+      operationId: listTransfers
+      summary: Riwayat mutasi terbaru terlebih dahulu
+      description: Urutan createdAt DESC lalu ID DESC. Filter gudang yang tidak ditemukan menghasilkan 422. Filter yang dikirim bersamaan digabung dengan AND.
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Limit' }
+        - name: sourceWarehouseId
+          in: query
+          schema: { $ref: '#/components/schemas/Id' }
+          description: ID gudang asal yang tersedia.
+        - name: destinationWarehouseId
+          in: query
+          schema: { $ref: '#/components/schemas/Id' }
+          description: ID gudang tujuan yang tersedia.
+      responses:
+        '200':
+          description: Daftar header mutasi. Detail barang tersedia pada endpoint detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/TransferHeader' }
+                  meta: { $ref: '#/components/schemas/Pagination' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+    post:
+      tags: [Transfers]
+      operationId: createTransfer
+      summary: Selesaikan mutasi dalam satu transaksi database
+      description: |
+        Gudang harus tersedia dan berbeda. Kirim 1–50 barang yang tersedia dengan ID berbeda.
+        Quantity harus angka JSON bulat positif, bukan string, maksimal 2147483647.
+        Stok diperiksa ulang setelah saldo dikunci dengan urutan warehouse_id/item_id.
+        Saldo tujuan yang belum ada dibuat dengan aman; saldo asal yang tidak ada dianggap nol.
+        Semua perubahan stok dan riwayat di-commit bersama atau seluruhnya di-rollback.
+        Menolak overflow saldo tujuan. Nomor referensi dan waktu dibuat oleh server.
+        Jangan ulangi POST otomatis jika koneksi terputus atau respons tidak diketahui.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferInput' }
+            examples:
+              singleItem:
+                summary: Mutasi 10 BRG-001 dari A ke B (AC-03)
+                value:
+                  sourceWarehouseId: 1
+                  destinationWarehouseId: 2
+                  notes: Pemindahan stok untuk kebutuhan gudang B
+                  items: [{ itemId: 1, quantity: 10 }]
+              multipleItems:
+                summary: Mutasi dua barang, termasuk saldo tujuan baru
+                value:
+                  sourceWarehouseId: 1
+                  destinationWarehouseId: 2
+                  items: [{ itemId: 1, quantity: 10 }, { itemId: 2, quantity: 5 }]
+      responses:
+        '201':
+          description: Mutasi berhasil dan saldo telah diperbarui.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+              example:
+                data:
+                  id: 1
+                  reference: MTS-20261025-12345678-1234-4234-8234-123456789abc
+                  createdAt: '2026-10-25T03:00:00.000Z'
+                  notes: Pemindahan stok untuk kebutuhan gudang B
+                  sourceWarehouse: { id: 1, code: GDG-A, name: Gudang A }
+                  destinationWarehouse: { id: 2, code: GDG-B, name: Gudang B }
+                  items: [{ itemId: 1, sku: BRG-001, name: Baut, unit: pcs, quantity: 10 }]
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: Stok saat ini tidak mencukupi. Tidak ada perubahan stok atau riwayat.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error:
+                  code: INSUFFICIENT_STOCK
+                  message: Stok BRG-001 tidak mencukupi.
+                  fields: { items.0.quantity: Stok tersedia 100. }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '415': { $ref: '#/components/responses/UnsupportedMediaType' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+  /transfers/{id}:
+    get:
+      tags: [Transfers]
+      operationId: getTransfer
+      summary: Detail mutasi beserta barang dan jumlahnya
+      description: SKU, nama, kode gudang, dan satuan diambil dari master saat ini. Snapshot historis tidak disimpan.
+      parameters:
+        - { $ref: '#/components/parameters/Id' }
+      responses:
+        '200':
+          description: Header dan detail mutasi.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransferResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+        default: { $ref: '#/components/responses/ServerError' }
+  /openapi.json:
+    get:
+      tags: [Health]
+      operationId: getOpenApi
+      summary: Spesifikasi OpenAPI dalam JSON
+      responses:
+        '200':
+          description: Dokumen OpenAPI 3.0.3.
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+  /docs:
+    get:
+      tags: [Health]
+      operationId: getSwaggerUi
+      summary: Dokumentasi interaktif Swagger UI
+      responses:
+        '200':
+          description: Halaman HTML Swagger UI. URL tanpa slash akhir dapat diarahkan ke /api/docs/.
+          content:
+            text/html:
+              schema: { type: string }
+        '301':
+          description: Dialihkan ke /api/docs/.
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: ID angka bulat positif. Format ID yang tidak valid menghasilkan 400.
+      schema: { $ref: '#/components/schemas/Id' }
+    Search:
+      name: search
+      in: query
+      description: Pencarian substring literal; spasi awal/akhir dihapus.
+      schema: { type: string, maxLength: 150, default: '' }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 2147483647, default: 1 }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+  responses:
+    BadRequest:
+      description: JSON rusak, format ID/query tidak valid, parameter duplikat, atau query yang tidak dikenal.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: Barang, gudang, atau mutasi tidak ditemukan.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: SKU/kode gudang duplikat atau satuan barang tidak dapat diubah.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PayloadTooLarge:
+      description: Body melebihi 64 KiB.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    UnsupportedMediaType:
+      description: Gunakan Content-Type application/json dengan UTF-8.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationError:
+      description: Payload tidak valid, ID referensi tidak ditemukan, gudang sama, barang duplikat, atau saldo tujuan overflow.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            invalidQuantity:
+              value:
+                error:
+                  code: VALIDATION_ERROR
+                  message: Data yang dikirim tidak valid.
+                  fields: { items.0.quantity: Jumlah harus berupa angka JSON. }
+            destinationOverflow:
+              value:
+                error:
+                  code: DESTINATION_OVERFLOW
+                  message: Stok gudang tujuan akan melebihi batas maksimum.
+                  fields: { items.0.quantity: Stok tujuan maksimal 2147483647. }
+    Unavailable:
+      description: |
+        DATABASE_BUSY: deadlock/lock timeout, transaksi telah dibatalkan; operator dapat mencoba kembali.
+        DATABASE_UNAVAILABLE: database belum siap atau koneksi bermasalah; periksa riwayat dan stok sebelum mengirim ulang mutasi.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error:
+              code: DATABASE_BUSY
+              message: Database sedang sibuk. Transaksi dibatalkan; silakan coba kembali.
+    ServerError:
+      description: Kesalahan server. SQL, credential, dan stack trace tidak dikembalikan.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: Terjadi kesalahan pada server. Periksa riwayat dan stok sebelum mengirim ulang mutasi.
+  schemas:
+    Id:
+      type: integer
+      minimum: 1
+      maximum: 2147483647
+      example: 1
+    ItemInput:
+      type: object
+      additionalProperties: false
+      required: [sku, name, unit]
+      properties:
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Di-trim, disimpan uppercase, dan harus unik.
+          example: BRG-001
+        name: { type: string, minLength: 1, maxLength: 150, example: Baut }
+        unit: { type: string, minLength: 1, maxLength: 20, example: pcs }
+    Item:
+      type: object
+      required: [id, sku, name, unit, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        sku: { type: string, minLength: 1, maxLength: 50 }
+        name: { type: string, minLength: 1, maxLength: 150 }
+        unit: { type: string, minLength: 1, maxLength: 20 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ItemResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Item' }
+    WarehouseInput:
+      type: object
+      additionalProperties: false
+      required: [code, name]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: Di-trim, disimpan uppercase, dan harus unik.
+          example: GDG-A
+        name: { type: string, minLength: 1, maxLength: 150, example: Gudang A }
+        address:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Opsional; teks kosong setelah trim menjadi null.
+          example: Jakarta
+    Warehouse:
+      type: object
+      required: [id, code, name, address, createdAt, updatedAt]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        code: { type: string, minLength: 1, maxLength: 50 }
+        name: { type: string, minLength: 1, maxLength: 150 }
+        address: { type: string, nullable: true, maxLength: 255 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    WarehouseResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/Warehouse' }
+    WarehouseSummary:
+      type: object
+      required: [id, code, name]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        code: { type: string, maxLength: 50 }
+        name: { type: string, maxLength: 150 }
+    Stock:
+      type: object
+      required: [warehouseId, itemId, sku, name, unit, quantity]
+      properties:
+        warehouseId: { $ref: '#/components/schemas/Id' }
+        itemId: { $ref: '#/components/schemas/Id' }
+        sku: { type: string, maxLength: 50 }
+        name: { type: string, maxLength: 150 }
+        unit: { type: string, maxLength: 20 }
+        quantity: { type: integer, minimum: 0, maximum: 2147483647 }
+    TransferInput:
+      type: object
+      additionalProperties: false
+      required: [sourceWarehouseId, destinationWarehouseId, items]
+      properties:
+        sourceWarehouseId: { $ref: '#/components/schemas/Id' }
+        destinationWarehouseId: { $ref: '#/components/schemas/Id' }
+        notes:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Opsional; teks kosong setelah trim menjadi null.
+        items:
+          type: array
+          minItems: 1
+          maxItems: 50
+          description: Setiap itemId harus berbeda dan tersedia.
+          items:
+            type: object
+            additionalProperties: false
+            required: [itemId, quantity]
+            properties:
+              itemId: { $ref: '#/components/schemas/Id' }
+              quantity:
+                type: integer
+                minimum: 1
+                maximum: 2147483647
+                description: Angka JSON; string angka, pecahan, nol, dan nilai negatif ditolak.
+    TransferHeader:
+      type: object
+      required: [id, reference, createdAt, notes, sourceWarehouse, destinationWarehouse]
+      properties:
+        id: { $ref: '#/components/schemas/Id' }
+        reference: { type: string, maxLength: 64 }
+        createdAt: { type: string, format: date-time }
+        notes: { type: string, nullable: true, maxLength: 500 }
+        sourceWarehouse: { $ref: '#/components/schemas/WarehouseSummary' }
+        destinationWarehouse: { $ref: '#/components/schemas/WarehouseSummary' }
+    TransferDetail:
+      allOf:
+        - { $ref: '#/components/schemas/TransferHeader' }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              minItems: 1
+              maxItems: 50
+              items:
+                type: object
+                required: [itemId, sku, name, unit, quantity]
+                properties:
+                  itemId: { $ref: '#/components/schemas/Id' }
+                  sku: { type: string, maxLength: 50 }
+                  name: { type: string, maxLength: 150 }
+                  unit: { type: string, maxLength: 20 }
+                  quantity: { type: integer, minimum: 1, maximum: 2147483647 }
+    TransferResponse:
+      type: object
+      required: [data]
+      properties:
+        data: { $ref: '#/components/schemas/TransferDetail' }
+    Pagination:
+      type: object
+      required: [page, limit, total]
+      properties:
+        page: { type: integer, minimum: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string, example: Data yang dikirim tidak valid. }
+            fields:
+              type: object
+              additionalProperties: { type: string }
+              description: Opsional. Key merupakan path input, misalnya items.0.quantity.

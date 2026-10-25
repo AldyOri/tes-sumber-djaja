@@ -1,0 +1,462 @@
+{
+  "version": "5",
+  "dialect": "mysql",
+  "tables": {
+    "items": {
+      "name": "items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "sku": {
+          "name": "sku",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "unit": {
+          "name": "unit",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(3))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(3))"
+        }
+      },
+      "indexes": {
+        "items_sku_unique": {
+          "name": "items_sku_unique",
+          "columns": [
+            "sku"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "items_id": {
+          "name": "items_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    },
+    "stock_transfer_items": {
+      "name": "stock_transfer_items",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "transfer_id": {
+          "name": "transfer_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "stock_transfer_items_transfer_item_unique": {
+          "name": "stock_transfer_items_transfer_item_unique",
+          "columns": [
+            "transfer_id",
+            "item_id"
+          ],
+          "isUnique": true
+        },
+        "stock_transfer_items_item_idx": {
+          "name": "stock_transfer_items_item_idx",
+          "columns": [
+            "item_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "stock_transfer_items_transfer_id_stock_transfers_id_fk": {
+          "name": "stock_transfer_items_transfer_id_stock_transfers_id_fk",
+          "tableFrom": "stock_transfer_items",
+          "tableTo": "stock_transfers",
+          "columnsFrom": [
+            "transfer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "stock_transfer_items_item_id_items_id_fk": {
+          "name": "stock_transfer_items_item_id_items_id_fk",
+          "tableFrom": "stock_transfer_items",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "stock_transfer_items_id": {
+          "name": "stock_transfer_items_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "stock_transfer_items_quantity_check": {
+          "name": "stock_transfer_items_quantity_check",
+          "value": "`stock_transfer_items`.`quantity` between 1 and 2147483647"
+        }
+      }
+    },
+    "stock_transfers": {
+      "name": "stock_transfers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "reference": {
+          "name": "reference",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_warehouse_id": {
+          "name": "source_warehouse_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "destination_warehouse_id": {
+          "name": "destination_warehouse_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(3))"
+        }
+      },
+      "indexes": {
+        "stock_transfers_reference_unique": {
+          "name": "stock_transfers_reference_unique",
+          "columns": [
+            "reference"
+          ],
+          "isUnique": true
+        },
+        "stock_transfers_created_idx": {
+          "name": "stock_transfers_created_idx",
+          "columns": [
+            "created_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "stock_transfers_source_idx": {
+          "name": "stock_transfers_source_idx",
+          "columns": [
+            "source_warehouse_id",
+            "created_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "stock_transfers_destination_idx": {
+          "name": "stock_transfers_destination_idx",
+          "columns": [
+            "destination_warehouse_id",
+            "created_at",
+            "id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "stock_transfers_source_warehouse_id_warehouses_id_fk": {
+          "name": "stock_transfers_source_warehouse_id_warehouses_id_fk",
+          "tableFrom": "stock_transfers",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "source_warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "stock_transfers_destination_warehouse_id_warehouses_id_fk": {
+          "name": "stock_transfers_destination_warehouse_id_warehouses_id_fk",
+          "tableFrom": "stock_transfers",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "destination_warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "stock_transfers_id": {
+          "name": "stock_transfers_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "stock_transfers_different_warehouses_check": {
+          "name": "stock_transfers_different_warehouses_check",
+          "value": "`stock_transfers`.`source_warehouse_id` <> `stock_transfers`.`destination_warehouse_id`"
+        }
+      }
+    },
+    "warehouse_stocks": {
+      "name": "warehouse_stocks",
+      "columns": {
+        "warehouse_id": {
+          "name": "warehouse_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "item_id": {
+          "name": "item_id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "quantity": {
+          "name": "quantity",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(3))"
+        }
+      },
+      "indexes": {
+        "warehouse_stocks_item_idx": {
+          "name": "warehouse_stocks_item_idx",
+          "columns": [
+            "item_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "warehouse_stocks_warehouse_id_warehouses_id_fk": {
+          "name": "warehouse_stocks_warehouse_id_warehouses_id_fk",
+          "tableFrom": "warehouse_stocks",
+          "tableTo": "warehouses",
+          "columnsFrom": [
+            "warehouse_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        },
+        "warehouse_stocks_item_id_items_id_fk": {
+          "name": "warehouse_stocks_item_id_items_id_fk",
+          "tableFrom": "warehouse_stocks",
+          "tableTo": "items",
+          "columnsFrom": [
+            "item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "restrict"
+        }
+      },
+      "compositePrimaryKeys": {
+        "warehouse_stocks_warehouse_id_item_id_pk": {
+          "name": "warehouse_stocks_warehouse_id_item_id_pk",
+          "columns": [
+            "warehouse_id",
+            "item_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {
+        "warehouse_stocks_quantity_check": {
+          "name": "warehouse_stocks_quantity_check",
+          "value": "`warehouse_stocks`.`quantity` between 0 and 2147483647"
+        }
+      }
+    },
+    "warehouses": {
+      "name": "warehouses",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(150)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "address": {
+          "name": "address",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(3))"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(UTC_TIMESTAMP(3))"
+        }
+      },
+      "indexes": {
+        "warehouses_code_unique": {
+          "name": "warehouses_code_unique",
+          "columns": [
+            "code"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "warehouses_id": {
+          "name": "warehouses_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {},
+    "indexes": {}
+  },
+  "id": "0a734b74-7496-49cd-b36e-6fe4d662c786",
+  "prevId": "00000000-0000-0000-0000-000000000000"
+}
